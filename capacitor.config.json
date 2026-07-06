@@ -1,0 +1,14 @@
+{
+  "appId": "com.mower.app",
+  "appName": "Газонокосилка",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "server": {
+    "cleartext": true,
+    "androidScheme": "http"
+  }
+}

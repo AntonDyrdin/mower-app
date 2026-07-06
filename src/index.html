@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Газонокосилка</title>
+<style>
+  :root {
+    --bg:      #0d1117;
+    --surface: #161b22;
+    --border:  #30363d;
+    --accent:  #3fb950;
+    --danger:  #f85149;
+    --warn:    #e3b341;
+    --text:    #e6edf3;
+    --muted:   #8b949e;
+    --r:       10px;
+    --gap:     10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100svh;
+    user-select: none;
+  }
+
+  /* ── Оверлей подключения ── */
+  #connect-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 100;
+    transition: opacity .3s;
+  }
+  #connect-overlay.hidden { opacity: 0; pointer-events: none; }
+  .connect-title { font-size: 18px; font-weight: 700; color: var(--text); }
+  .connect-sub   { font-size: 13px; color: var(--muted); }
+  .connect-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .connect-btn {
+    margin-top: 8px;
+    padding: 10px 24px;
+    background: var(--accent);
+    color: #0d1117;
+    font-weight: 700;
+    font-size: 14px;
+    border: none;
+    border-radius: var(--r);
+    cursor: pointer;
+  }
+
+  /* ── OTA оверлей ── */
+  #ota-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(13,17,23,.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 200;
+    display: none;
+  }
+  #ota-overlay.visible { display: flex; }
+  .ota-title  { font-size: 16px; font-weight: 700; }
+  .ota-sub    { font-size: 12px; color: var(--muted); }
+  .ota-bar-wrap {
+    width: 260px; height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .ota-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    width: 0%;
+    transition: width .2s;
+  }
+  .ota-pct { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+
+  /* ── Общая обёртка ── */
+  .app {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+    padding: var(--gap);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  @media (min-width: 720px) {
+    body { padding: 16px; }
+    .app {
+      max-width: 1100px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-areas:
+        "status  status"
+        "logs    controls"
+        "sensors imu";
+      align-items: start;
+    }
+    .status-bar  { grid-area: status; }
+    .log-block   { grid-area: logs; }
+    .controls    { grid-area: controls; }
+    .sensors     { grid-area: sensors; }
+    .imu-card    { grid-area: imu; }
+  }
+
+  /* ── Строка состояния ── */
+  .status-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 8px 12px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    min-width: 60px;
+  }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .stat-value {
+    font-size: 17px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2; transition: color .2s;
+  }
+  .stat-divider { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
+
+  /* ── WS-индикатор в статусбаре ── */
+  .ws-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--danger);
+    flex-shrink: 0;
+    transition: background .3s;
+  }
+  .ws-dot.connected { background: var(--accent); }
+
+  /* ── Логи ── */
+  .log-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .log-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .log-clear {
+    font-size: 10px; color: var(--muted);
+    background: none; border: none; cursor: pointer;
+    padding: 2px 6px; border-radius: 4px;
+    transition: background .1s, color .1s;
+  }
+  .log-clear:hover { background: var(--border); color: var(--text); }
+  .log-list {
+    height: 64px;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+  @media (min-width: 720px) { .log-list { height: 237px; } }
+  .log-list::-webkit-scrollbar { width: 3px; }
+  .log-list::-webkit-scrollbar-track { background: transparent; }
+  .log-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-entry {
+    display: flex; gap: 6px; padding: 1px 10px;
+    font-size: 11px;
+    font-family: "SF Mono", "Fira Code", monospace;
+    line-height: 1.5;
+  }
+  .log-time { color: var(--muted); flex-shrink: 0; font-size: 10px; padding-top: 1px; }
+  .log-text { color: var(--text); word-break: break-all; }
+  .log-text.warn  { color: var(--warn); }
+  .log-text.error { color: var(--danger); }
+
+  /* ── Блок управления ── */
+  .controls { display: flex; flex-direction: column; gap: var(--gap); }
+
+  .speed-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px;
+    touch-action: pan-x;
+  }
+  .speed-block-label {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: var(--muted); margin-bottom: 8px;
+  }
+  .speed-block-label strong { color: var(--text); font-size: 14px; }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%; height: 5px;
+    border-radius: 3px; background: var(--border);
+    outline: none; cursor: pointer; touch-action: pan-x;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); border: 3px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .ctrl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ctrl-left  { display: flex; flex-direction: column; gap: 8px; }
+  .ctrl-right { display: flex; flex-direction: column; gap: 8px; }
+  .ctrl-lr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; }
+
+  .dpad-btn {
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    font-size: 26px; cursor: pointer;
+    touch-action: manipulation;
+    transition: background .1s, border-color .1s;
+    -webkit-user-select: none;
+    height: 70px;
+  }
+  .dpad-btn.pressed { background: #1f3a1f; border-color: var(--accent); }
+
+  .btn-scythe {
+    margin: 11px;
+    background: #2a0f0f;
+    border-color: var(--danger);
+    color: var(--danger);
+    font-size: 14px; font-weight: 600;
+    height: 48px;
+  }
+  .btn-scythe.active { background: var(--danger); color: #fff; }
+
+  .tasks-block { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
+  .task-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); color: var(--muted);
+    font-size: 11px; font-weight: 600;
+    padding: 8px 4px; cursor: pointer;
+    text-align: center; touch-action: manipulation;
+    transition: background .1s, color .1s, border-color .1s;
+    letter-spacing: .3px;
+  }
+  .task-btn:hover { background: var(--border); color: var(--text); }
+  .task-btn.active { background: #1a2f1a; border-color: var(--accent); color: var(--accent); }
+
+  /* ── Датчики ── */
+  .sensors { display: flex; flex-direction: column; gap: var(--gap); }
+  .sensor-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 10px 12px;
+  }
+  .sensor-title {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .6px; margin-bottom: 8px;
+  }
+
+  .perimeter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .peri-item { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+  .peri-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .peri-value {
+    font-size: 22px; font-weight: 700;
+    font-variant-numeric: tabular-nums; transition: color .2s;
+  }
+  .peri-value.pos { color: var(--accent); }
+  .peri-value.neg { color: #79c0ff; }
+
+  .angle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin-bottom: 8px; }
+  .angle-item { display: flex; justify-content: space-between; align-items: baseline; }
+  .angle-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .angle-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; transition: color .2s; }
+
+  .bars { display: flex; flex-direction: column; gap: 5px; }
+  .bar-col { display: flex; align-items: center; gap: 6px; }
+  .bar-label { font-size: 10px; color: var(--muted); width: 20px; flex-shrink: 0; text-align: right; }
+  .bar-wrap {
+    flex: 1; height: 11px; position: relative;
+    background: #0d1117; border-radius: 3px; overflow: hidden;
+  }
+  .bar-fill {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: var(--accent); border-radius: 3px;
+    transition: width 0.05s linear;
+  }
+  .bar-peak { position: absolute; top: 0; width: 2px; height: 100%; background: #f0a030; transition: left 0.15s ease-out; }
+
+  .imu-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 10px 12px;
+  }
+
+  /* ── Индикатор режима ── */
+  .mode-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    background: var(--surface);
+    transition: color .3s, border-color .3s;
+    letter-spacing: .3px;
+  }
+  .mode-badge.docked     { color: var(--accent); border-color: var(--accent); }
+  .mode-badge.autonomous { color: var(--warn);   border-color: var(--warn); }
+  .mode-badge-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+  }
+
+  /* Заблокированные кнопки задач в автономном режиме */
+  .task-btn.locked {
+    opacity: .35;
+    cursor: not-allowed;
+  }
+
+  /* ── OTA кнопка ── */
+  .ota-trigger-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); color: var(--muted);
+    font-size: 12px; font-weight: 600;
+    padding: 10px; cursor: pointer;
+    text-align: center; touch-action: manipulation;
+    transition: background .1s, color .1s, border-color .1s;
+    width: 100%;
+  }
+  .ota-trigger-btn:hover { border-color: var(--warn); color: var(--warn); }
+</style>
+</head>
+<body>
+
+<!-- Оверлей подключения -->
+<div id="connect-overlay">
+  <div class="connect-spinner"></div>
+  <div class="connect-title">Подключение к роботу</div>
+  <div class="connect-sub" id="connect-sub">Ищем сеть mower_ap…</div>
+  <button class="connect-btn" id="connect-retry" style="display:none" onclick="wsConnect()">Повторить</button>
+</div>
+
+<!-- OTA оверлей -->
+<div id="ota-overlay">
+  <div class="ota-title">Обновление прошивки</div>
+  <div class="ota-pct" id="ota-pct">0%</div>
+  <div class="ota-bar-wrap"><div class="ota-bar-fill" id="ota-bar"></div></div>
+  <div class="ota-sub">Не закрывайте приложение</div>
+</div>
+
+<div class="app">
+
+  <!-- 1. Строка состояния -->
+  <div class="status-bar">
+    <div class="ws-dot" id="ws-dot"></div>
+    <div class="mode-badge autonomous" id="mode-badge">
+      <span class="mode-badge-dot"></span>
+      <span id="mode-label">Авто</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Разряд</span>
+      <span class="stat-value" id="stat-discharge">—</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-label">Заряд</span>
+      <span class="stat-value" id="stat-charge">—</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-label">Напряж.</span>
+      <span class="stat-value" id="stat-volts">—</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-label">АКБ</span>
+      <span class="stat-value" id="stat-pct">—</span>
+    </div>
+  </div>
+
+  <!-- 2. Логи -->
+  <div class="log-block">
+    <div class="log-header">
+      <span class="log-title">Лог</span>
+      <button class="log-clear" id="log-clear">Очистить</button>
+    </div>
+    <div class="log-list" id="log-list"></div>
+  </div>
+
+  <!-- 3. Блок управления -->
+  <div class="controls">
+    <div class="speed-block">
+      <div class="speed-block-label">
+        Скорость <strong id="speed-label">180</strong>
+      </div>
+      <input type="range" id="speed-range" min="100" max="255" value="180">
+    </div>
+
+    <div class="ctrl-grid">
+      <div class="ctrl-left">
+        <button class="dpad-btn btn-fwd"  id="btn-fwd">&#9650;</button>
+        <button class="dpad-btn btn-bwd"  id="btn-bwd">&#9660;</button>
+      </div>
+      <div class="ctrl-right">
+        <button class="dpad-btn btn-scythe" id="btn-scythe">&#9986; Коса</button>
+        <div class="ctrl-lr-row">
+          <button class="dpad-btn btn-left"  id="btn-left">&#9664;</button>
+          <button class="dpad-btn btn-right" id="btn-right">&#9654;</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tasks-block">
+      <button class="task-btn" id="task-none">STOP</button>
+      <button class="task-btn" id="task-perimeter_run">BladeRun</button>
+      <button class="task-btn" id="task-mowing">Mow</button>
+      <button class="task-btn" id="task-go_home">Go Home</button>
+    </div>
+
+    <!-- OTA кнопка -->
+    <button class="ota-trigger-btn" id="ota-btn">⬆ Обновить прошивку (.bin)</button>
+    <input type="file" id="ota-file-input" accept=".bin" style="display:none">
+  </div>
+
+  <!-- 4. Датчики периметра + углы -->
+  <div class="sensors">
+    <div class="sensor-card">
+      <div class="perimeter-row">
+        <div class="peri-item">
+          <span class="peri-label">Лев. перим.</span>
+          <span class="peri-value" id="corr-l">—</span>
+        </div>
+        <div class="peri-item">
+          <span class="peri-label">Прав. перим.</span>
+          <span class="peri-value" id="corr-r">—</span>
+        </div>
+      </div>
+      <div class="angle-grid">
+        <div class="angle-item">
+          <span class="angle-label">Наклон</span>
+          <span class="angle-value" id="angle-pitch-val">—</span>
+        </div>
+        <div class="angle-item">
+          <span class="angle-label">Крен</span>
+          <span class="angle-value" id="angle-roll-val">—</span>
+        </div>
+        <div class="angle-item">
+          <span class="angle-label">Наклон фильтр.</span>
+          <span class="angle-value" id="angle-fpitch-val">—</span>
+        </div>
+        <div class="angle-item">
+          <span class="angle-label">Крен фильтр.</span>
+          <span class="angle-value" id="angle-froll-val">—</span>
+        </div>
+      </div>
+      <div class="bars" id="angle-bars"></div>
+    </div>
+  </div>
+
+  <!-- 5. IMU гистограмма -->
+  <div class="imu-card">
+    <div class="bars" id="bars"></div>
+  </div>
+
+</div>
+
+<script>
+// ── Конфигурация ──────────────────────────────────────────────
+const ESP_HOST = '192.168.4.1';
+
+// ── Режим работы ──────────────────────────────────────────────
+let isDocked = false;
+
+function setMode(docked) {
+  if (isDocked === docked) return;
+  isDocked = docked;
+
+  const badge = document.getElementById('mode-badge');
+  const label = document.getElementById('mode-label');
+  const taskBtns = document.querySelectorAll('.task-btn:not(#task-none)');
+
+  if (docked) {
+    badge.className = 'mode-badge docked';
+    label.textContent = 'База';
+    taskBtns.forEach(b => b.classList.remove('locked'));
+  } else {
+    badge.className = 'mode-badge autonomous';
+    label.textContent = 'Авто';
+    taskBtns.forEach(b => b.classList.add('locked'));
+    // Снимаем активную задачу если была
+    document.querySelectorAll('.task-btn').forEach(b => b.classList.remove('active'));
+  }
+}
+const WS_URL   = 'ws://' + ESP_HOST + ':81/';
+const OTA_URL  = 'http://' + ESP_HOST + '/update';
+
+// ── Overlay ───────────────────────────────────────────────────
+const overlay    = document.getElementById('connect-overlay');
+const connectSub = document.getElementById('connect-sub');
+const retryBtn   = document.getElementById('connect-retry');
+const wsDot      = document.getElementById('ws-dot');
+
+function showOverlay(msg) {
+  connectSub.textContent = msg;
+  overlay.classList.remove('hidden');
+  retryBtn.style.display = 'none';
+}
+function showRetry(msg) {
+  connectSub.textContent = msg;
+  overlay.classList.remove('hidden');
+  retryBtn.style.display = '';
+}
+function hideOverlay() {
+  overlay.classList.add('hidden');
+}
+
+// ── Логи ──────────────────────────────────────────────────────
+const logList  = document.getElementById('log-list');
+const pageStart = Date.now();
+
+function logTimestamp() {
+  const t = Math.floor((Date.now() - pageStart) / 1000);
+  return String(Math.floor(t/60)).padStart(2,'0') + ':' + String(t%60).padStart(2,'0');
+}
+
+function addLog(text) {
+  let cls = '';
+  const lo = text.toLowerCase();
+  if (lo.includes('error') || lo.includes('ошибка') || lo.includes('emergency')) cls = 'error';
+  else if (lo.includes('warn') || lo.includes('ota') || lo.includes('task')) cls = 'warn';
+
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML =
+    '<span class="log-time">' + logTimestamp() + '</span>' +
+    '<span class="log-text ' + cls + '">' + escapeHtml(text) + '</span>';
+  logList.appendChild(entry);
+  while (logList.children.length > 200) logList.removeChild(logList.firstChild);
+  const atBottom = logList.scrollHeight - logList.scrollTop - logList.clientHeight < 40;
+  if (atBottom) logList.scrollTop = logList.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('log-clear').addEventListener('click', () => { logList.innerHTML = ''; });
+
+// ── Гистограмма IMU ───────────────────────────────────────────
+const BAR_LABELS = ['aX','aY','aZ','gX','gY','gZ'];
+const barsEl = document.getElementById('bars');
+const barFills = [], barPeaks = [];
+
+BAR_LABELS.forEach(lbl => {
+  const col = document.createElement('div'); col.className = 'bar-col';
+  const label = document.createElement('div'); label.className = 'bar-label'; label.textContent = lbl;
+  const wrap = document.createElement('div'); wrap.className = 'bar-wrap';
+  const fill = document.createElement('div'); fill.className = 'bar-fill'; fill.style.width = '0%';
+  const peak = document.createElement('div'); peak.className = 'bar-peak'; peak.style.left = '0%';
+  wrap.appendChild(fill); wrap.appendChild(peak);
+  col.appendChild(label); col.appendChild(wrap);
+  barsEl.appendChild(col);
+  barFills.push(fill); barPeaks.push(peak);
+});
+
+// ── Гистограмма углов ─────────────────────────────────────────
+const ANGLE_LABELS = ['Pitch','Roll','Pitch F','Roll F'];
+const angleBarsEl = document.getElementById('angle-bars');
+const angleBarFills = [], angleBarPeaks = [];
+const anglePeaks = [0,0,0,0];
+
+ANGLE_LABELS.forEach(lbl => {
+  const col = document.createElement('div'); col.className = 'bar-col';
+  const label = document.createElement('div'); label.className = 'bar-label'; label.style.width = '46px'; label.textContent = lbl;
+  const wrap = document.createElement('div'); wrap.className = 'bar-wrap';
+  const fill = document.createElement('div'); fill.className = 'bar-fill'; fill.style.width = '0%';
+  const peak = document.createElement('div'); peak.className = 'bar-peak'; peak.style.left = '0%';
+  wrap.appendChild(fill); wrap.appendChild(peak);
+  col.appendChild(label); col.appendChild(wrap);
+  angleBarsEl.appendChild(col);
+  angleBarFills.push(fill); angleBarPeaks.push(peak);
+});
+
+const angleValEls = [
+  document.getElementById('angle-pitch-val'),
+  document.getElementById('angle-roll-val'),
+  document.getElementById('angle-fpitch-val'),
+  document.getElementById('angle-froll-val'),
+];
+
+function angleColor(absVal) {
+  if (absVal >= 40) return 'var(--danger)';
+  if (absVal >= 30) return 'var(--warn)';
+  return 'var(--text)';
+}
+
+function updateAngles(pitch, roll, fpitch, froll) {
+  const vals = [pitch, roll, fpitch, froll];
+  vals.forEach((v, i) => {
+    const absV = Math.abs(v);
+    const pct  = Math.min(absV / 90, 1);
+    if (pct >= anglePeaks[i]) { anglePeaks[i] = pct; }
+    else { anglePeaks[i] *= 0.95; if (anglePeaks[i] < pct) anglePeaks[i] = pct; }
+    const color = angleColor(absV);
+    angleBarFills[i].style.width      = (pct*100).toFixed(1) + '%';
+    angleBarFills[i].style.background = color;
+    angleBarPeaks[i].style.left       = (anglePeaks[i]*100).toFixed(1) + '%';
+    angleValEls[i].textContent = (v >= 0 ? '+' : '') + v.toFixed(1) + '°';
+    angleValEls[i].style.color = color;
+  });
+}
+
+function updateBars(vals, peaks) {
+  for (let i = 0; i < 6; i++) {
+    barFills[i].style.width = (Math.abs(vals[i]) * 100).toFixed(1) + '%';
+    barPeaks[i].style.left  = (peaks[i] * 100).toFixed(1) + '%';
+    const v = Math.abs(vals[i]);
+    barFills[i].style.background = v < 0.7 ? 'var(--accent)' : v < 0.9 ? 'var(--warn)' : 'var(--danger)';
+  }
+}
+
+// ── Периметр ──────────────────────────────────────────────────
+const corrLEl = document.getElementById('corr-l');
+const corrREl = document.getElementById('corr-r');
+function updateCorr(l, r) {
+  [corrLEl, corrREl].forEach((el, i) => {
+    const v = i === 0 ? l : r;
+    el.textContent = (v > 0 ? '+' : '') + v;
+    el.className = 'peri-value' + (v > 0 ? ' pos' : v < 0 ? ' neg' : '');
+  });
+}
+
+// ── Строка состояния ──────────────────────────────────────────
+const statDischargeEl = document.getElementById('stat-discharge');
+const statChargeEl    = document.getElementById('stat-charge');
+const statVoltsEl     = document.getElementById('stat-volts');
+const statPctEl       = document.getElementById('stat-pct');
+
+function fmtCurrent(ma) {
+  const sign = ma >= 0 ? '+' : '';
+  return Math.abs(ma) >= 1000
+    ? sign + (ma / 1000).toFixed(2) + 'А'
+    : sign + ma + 'мА';
+}
+
+function updateStatus(pct, mv10, currentMa, chargeCurrentMa) {
+  statVoltsEl.textContent  = (mv10 / 10).toFixed(1) + 'В';
+  statPctEl.textContent    = pct + '%';
+  statPctEl.style.color    = pct <= 20 ? 'var(--danger)' : pct <= 50 ? 'var(--warn)' : 'var(--accent)';
+  statDischargeEl.textContent = fmtCurrent(currentMa);
+  statDischargeEl.style.color = currentMa < 0 ? 'var(--accent)' : 'var(--text)';
+  statChargeEl.textContent = fmtCurrent(chargeCurrentMa);
+  statChargeEl.style.color = chargeCurrentMa < 0 ? 'var(--accent)' : 'var(--text)';
+}
+
+// ── WebSocket ─────────────────────────────────────────────────
+let ws, wsReady = false;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+
+function wsConnect() {
+  clearTimeout(reconnectTimer);
+  showOverlay('Подключаемся к ' + ESP_HOST + '…');
+
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    wsReady = true;
+    reconnectAttempts = 0;
+    hideOverlay();
+    wsDot.classList.add('connected');
+    addLog('WS подключён');
+  };
+
+  ws.onclose = () => {
+    wsReady = false;
+    wsDot.classList.remove('connected');
+    reconnectAttempts++;
+    addLog('WS отключён');
+    if (reconnectAttempts >= 5) {
+      showRetry('Не удаётся подключиться к роботу');
+    } else {
+      showOverlay('Переподключение… (попытка ' + reconnectAttempts + ')');
+      reconnectTimer = setTimeout(wsConnect, 1500);
+    }
+  };
+
+  ws.onerror = () => { ws.close(); };
+
+  ws.onmessage = (e) => {
+    const msg = e.data;
+    if (msg.startsWith('L:')) { addLog(msg.substring(2)); return; }
+    if (msg.startsWith('OTA:')) {
+      const pct = parseInt(msg.substring(4));
+      document.getElementById('ota-bar').style.width = pct + '%';
+      document.getElementById('ota-pct').textContent = pct + '%';
+      return;
+    }
+    if (msg.startsWith('MODE:')) {
+      setMode(msg.substring(5) === 'DOCKED');
+      return;
+    }
+    if (msg.startsWith('S:')) {
+      const parts = msg.substring(2).split(':');
+      if (parts.length < 3) return;
+      updateBars(parts[0].split(',').map(Number), parts[1].split(',').map(Number));
+      updateAngles(parseInt(parts[2]), parseInt(parts[3]), parseInt(parts[4]), parseInt(parts[5]));
+      updateCorr(parseInt(parts[6]), parseInt(parts[7]));
+      updateStatus(parseInt(parts[8]), parseInt(parts[9]), parseInt(parts[10]), parseInt(parts[11]));
+    }
+  };
+}
+
+function wsSend(msg) { if (ws && wsReady) ws.send(msg); }
+wsConnect();
+
+// ── Управление кнопками ───────────────────────────────────────
+const pressed = { fwd: false, bwd: false, left: false, right: false };
+let sendTimer = null;
+
+function calcAndSend() {
+  const fwd   = pressed.fwd  && !pressed.bwd;
+  const bwd   = pressed.bwd  && !pressed.fwd;
+  const left  = pressed.left && !pressed.right;
+  const right = pressed.right && !pressed.left;
+  const y = fwd ? 1 : bwd ? -1 : 0;
+  const x = right ? 1 : left ? -1 : 0;
+  if (x === 0 && y === 0) { wsSend('stop'); return; }
+  let lSpeed, rSpeed;
+  if (y === 0)    { lSpeed =  x; rSpeed = -x; }
+  else if (x > 0) { lSpeed =  y; rSpeed =  0; }
+  else if (x < 0) { lSpeed =  0; rSpeed =  y; }
+  else             { lSpeed =  y; rSpeed =  y; }
+  wsSend('l:' + lSpeed.toFixed(1) + ':r:' + rSpeed.toFixed(1));
+}
+
+function startTimer() {
+  if (sendTimer) return;
+  calcAndSend();
+  sendTimer = setInterval(calcAndSend, 100);
+}
+function stopTimer() {
+  if (Object.values(pressed).some(Boolean)) return;
+  clearInterval(sendTimer); sendTimer = null;
+  wsSend('stop');
+}
+
+const btnMap = { 'btn-fwd':'fwd', 'btn-bwd':'bwd', 'btn-left':'left', 'btn-right':'right' };
+Object.entries(btnMap).forEach(([id, key]) => {
+  const el = document.getElementById(id);
+  const onPress   = e => { e.preventDefault(); pressed[key] = true;  el.classList.add('pressed');    startTimer(); };
+  const onRelease = e => { e.preventDefault(); pressed[key] = false; el.classList.remove('pressed'); stopTimer();  };
+  el.addEventListener('mousedown',   onPress);
+  el.addEventListener('touchstart',  onPress,   { passive: false });
+  el.addEventListener('mouseup',     onRelease);
+  el.addEventListener('mouseleave',  onRelease);
+  el.addEventListener('touchend',    onRelease, { passive: false });
+  el.addEventListener('touchcancel', onRelease, { passive: false });
+});
+
+// Коса
+const scytheBtn = document.getElementById('btn-scythe');
+['mousedown','touchstart'].forEach(ev => scytheBtn.addEventListener(ev, () => {
+  scytheBtn.classList.add('active'); wsSend('scythe_on');
+}));
+['mouseup','mouseleave','touchend','touchcancel'].forEach(ev => scytheBtn.addEventListener(ev, () => {
+  scytheBtn.classList.remove('active'); wsSend('scythe_off');
+}));
+
+// Скорость
+document.getElementById('speed-range').addEventListener('input', function() {
+  document.getElementById('speed-label').textContent = this.value;
+  wsSend('speed:' + this.value);
+});
+
+// Задачи
+['task-none','task-perimeter_run','task-mowing','task-go_home'].forEach(id => {
+  document.getElementById(id).addEventListener('click', () => {
+    // Кнопки задач (кроме STOP) заблокированы в автономном режиме
+    if (id !== 'task-none' && !isDocked) return;
+    document.querySelectorAll('.task-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById(id);
+    if (id !== 'task-none') btn.classList.add('active');
+    wsSend('task:' + id.substring(5));
+  });
+});
+
+// ── OTA ───────────────────────────────────────────────────────
+const otaOverlay   = document.getElementById('ota-overlay');
+const otaFileInput = document.getElementById('ota-file-input');
+
+document.getElementById('ota-btn').addEventListener('click', () => {
+  otaFileInput.click();
+});
+
+otaFileInput.addEventListener('change', async () => {
+  const file = otaFileInput.files[0];
+  if (!file) return;
+  otaFileInput.value = '';
+
+  otaOverlay.classList.add('visible');
+  document.getElementById('ota-bar').style.width = '0%';
+  document.getElementById('ota-pct').textContent = '0%';
+
+  addLog('OTA: начало загрузки ' + file.name + ' (' + (file.size / 1024).toFixed(1) + ' КБ)');
+
+  try {
+    // XMLHttpRequest даёт нам прогресс загрузки на стороне клиента
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', OTA_URL);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          // Прогресс отправки (~50% общего), остальное — флэш на ESP32 через WS
+          const pct = Math.round((e.loaded / e.total) * 50);
+          document.getElementById('ota-bar').style.width = pct + '%';
+          document.getElementById('ota-pct').textContent = pct + '%';
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) resolve();
+        else reject(new Error('HTTP ' + xhr.status));
+      };
+      xhr.onerror = () => reject(new Error('Сетевая ошибка'));
+
+      const fd = new FormData();
+      fd.append('firmware', file, file.name);
+      xhr.send(fd);
+    });
+
+    addLog('OTA: файл передан, ESP32 перезагружается…');
+    // ESP32 перезагружается ~3-5с, потом переподключаемся
+    setTimeout(() => {
+      otaOverlay.classList.remove('visible');
+      reconnectAttempts = 0;
+      wsConnect();
+    }, 5000);
+
+  } catch (err) {
+    otaOverlay.classList.remove('visible');
+    addLog('OTA ERROR: ' + err.message);
+  }
+});
+</script>
+</body>
+</html>

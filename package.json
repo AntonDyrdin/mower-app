@@ -1,0 +1,17 @@
+{
+  "name": "mower-app",
+  "version": "1.0.0",
+  "description": "Android UI для робота-газонокосилки",
+  "scripts": {
+    "build": "mkdir -p dist && cp src/index.html dist/index.html",
+    "sync": "npm run build && npx cap sync android",
+    "open": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.1"
+  }
+}

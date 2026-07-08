@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Газонокосилка</string>
-    <string name="title_activity_main">Газонокосилка</string>
+    <string name="app_name">Робот Ёжик</string>
+    <string name="title_activity_main">Робот Ёжик</string>
     <string name="package_name">com.mower.app</string>
     <string name="custom_url_scheme">com.mower.app</string>
 </resources>

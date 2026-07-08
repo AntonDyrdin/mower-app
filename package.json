@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Android UI для робота-газонокосилки",
   "scripts": {
-    "build": "mkdir -p dist && cp src/index.html dist/index.html",
+    "build": "xcopy /E /I /Y src dist",
     "sync": "npm run build && npx cap sync android",
     "open": "npx cap open android"
   },
@@ -12,6 +12,7 @@
     "@capacitor/core": "^6.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.1"
   }
 }

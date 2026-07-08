@@ -1,8 +1,8 @@
 import { WifiConnect } from '@falconeta/capacitor-wifi-connect';
 import { FilePicker }  from '@capawesome/capacitor-file-picker';
 
-const MOWER_SSID     = 'mower_ap';
-const MOWER_PASSWORD = 'mower_pass';
+const MOWER_SSID     = 'Yozhik';
+const MOWER_PASSWORD = 'yozhik-robot';
 const MOWER_IP       = '192.168.4.1';
 
 // ── WiFi: автоподключение при запуске ────────────────────────

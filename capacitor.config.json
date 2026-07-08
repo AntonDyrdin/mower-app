@@ -1,6 +1,6 @@
 {
   "appId": "com.mower.app",
-  "appName": "Газонокосилка",
+  "appName": "Робот Ёжик",
   "webDir": "dist",
   "android": {
     "allowMixedContent": true,

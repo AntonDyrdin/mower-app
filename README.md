@@ -82,6 +82,5 @@ ESP→App:  OTA:42            прогресс флэша (%)
 App→ESP:  l:1.0:r:0.5       моторы
 App→ESP:  stop / speed:180 / scythe_on / scythe_off / task:mowing
 
-## Разработка без телефона
 
-Открыть src/index.html в браузере. WebSocket будет падать — это нормально.
+npx @capacitor/assets generate --android --iconBackgroundColor "#212120" --splashBackgroundColor "#212120"

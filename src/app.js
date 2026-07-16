@@ -159,27 +159,125 @@ const statPctEl       = document.getElementById('stat-pct');
 
 const scytheCurrentEl = document.getElementById('scythe-current');
 
+/* ── История значений (график) ────────────────────────────── */
+const HISTORY_LEN = 2000;
+
+const historyCanvas = document.getElementById('history-canvas');
+const historyCtx    = historyCanvas.getContext('2d');
+const historyLegend = document.getElementById('history-legend');
+
+const historySeries = [
+  { key: 'volts',     label: 'Напряж., В',   unit: 'В',  color: '#3fb950', data: [] },
+  { key: 'unloaded',  label: 'Без нагр., В', unit: 'В',  color: '#79c0ff', data: [] },
+  { key: 'discharge', label: 'Разряд, мА',   unit: 'мА', color: '#e3b341', data: [] },
+];
+
+function buildHistoryLegend() {
+  historyLegend.innerHTML = '';
+  historySeries.forEach(s => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML =
+      '<span class="legend-swatch" style="background:' + s.color + '"></span>' +
+      '<span id="legend-val-' + s.key + '">' + s.label + ': —</span>';
+    historyLegend.appendChild(item);
+  });
+}
+buildHistoryLegend();
+
+function resizeHistoryCanvas() {
+  const dpr  = window.devicePixelRatio || 1;
+  const rect = historyCanvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  historyCanvas.width  = rect.width * dpr;
+  historyCanvas.height = rect.height * dpr;
+  historyCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', () => { resizeHistoryCanvas(); drawHistory(); });
+
+function drawHistory() {
+  const rect = historyCanvas.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  if (!w || !h) return;
+  historyCtx.clearRect(0, 0, w, h);
+
+  historyCtx.strokeStyle = 'rgba(255,255,255,0.06)';
+  historyCtx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    const y = Math.round((h / 4) * i) + 0.5;
+    historyCtx.beginPath();
+    historyCtx.moveTo(0, y);
+    historyCtx.lineTo(w, y);
+    historyCtx.stroke();
+  }
+
+  const stepX = w / (HISTORY_LEN - 1);
+
+  historySeries.forEach(s => {
+    if (s.data.length < 2) return;
+    const min   = Math.min(...s.data);
+    const max   = Math.max(...s.data);
+    const range = (max - min) || 1;
+    const offset = HISTORY_LEN - s.data.length;
+
+    historyCtx.beginPath();
+    historyCtx.strokeStyle = s.color;
+    historyCtx.lineWidth = 1.5;
+    s.data.forEach((v, i) => {
+      const x = (offset + i) * stepX;
+      const y = h - ((v - min) / range) * (h - 8) - 4;
+      if (i === 0) historyCtx.moveTo(x, y);
+      else historyCtx.lineTo(x, y);
+    });
+    historyCtx.stroke();
+  });
+}
+
+function updateHistoryLegend() {
+  historySeries.forEach(s => {
+    const el = document.getElementById('legend-val-' + s.key);
+    if (!el) return;
+    const last = s.data[s.data.length - 1];
+    el.textContent = s.label + ': ' + (last === undefined ? '—' : last.toFixed(2));
+  });
+}
+
+function pushHistory(volts, unloaded, dischargeMa) {
+  const vals = [volts, unloaded, dischargeMa];
+  historySeries.forEach((s, i) => {
+    s.data.push(vals[i]);
+    if (s.data.length > HISTORY_LEN) s.data.shift();
+  });
+  updateHistoryLegend();
+  drawHistory();
+}
+
+resizeHistoryCanvas();
+
 function fmtCurrent(ma) {
   return Math.abs(ma) >= 1000
     ? (ma / 1000).toFixed(2) + 'А'
     : ma + 'мА';
 }
 
-function updateStatus(pct, mv100, currentMa, chargeCurrentMa, unloadedVoltage) {
-  statVoltsEl.textContent     = (mv100 / 100).toFixed(2) + 'В';
+function updateStatus(pct, voltage, currentMa, chargeCurrentMa, unloadedVoltage) {
+  statVoltsEl.textContent     = (voltage / 1000).toFixed(2) + 'В';
   statPctEl.textContent       = pct + '%';
   statPctEl.style.color       = pct <= 20 ? 'var(--danger)' : pct <= 50 ? 'var(--warn)' : 'var(--accent)';
   statDischargeEl.textContent = fmtCurrent(currentMa);
   statDischargeEl.style.color = currentMa < 0 ? 'var(--accent)' : 'var(--text)';
   statChargeEl.textContent    = fmtCurrent(chargeCurrentMa);
   statChargeEl.style.color    = chargeCurrentMa < 0 ? 'var(--accent)' : 'var(--text)';
-  if(Math.abs(unloadedVoltage - mv100) > 1) {
+
+  const scytheA = ((unloadedVoltage - voltage)) / 330 - currentMa / 1000.0;
+  if(Math.abs(unloadedVoltage - voltage) > 1) {
     scytheCurrentEl.style.display = '';
-    // scytheCurrentEl.textContent = (((unloadedVoltage - mv100) / 100) / 0.33 - currentMa / 1000).toFixed(2) + 'A';
-    scytheCurrentEl.textContent = (((unloadedVoltage - mv100) / 100) / 0.33).toFixed(2) + 'A';
+    scytheCurrentEl.textContent = scytheA.toFixed(2) + 'A';
   } else {
     scytheCurrentEl.style.display = 'none';
   }
+
+  pushHistory(voltage / 1000, unloadedVoltage / 1000, currentMa);
 }
 
 /* ── WebSocket ─────────────────────────────────────────────── */

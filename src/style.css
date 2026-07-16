@@ -143,26 +143,6 @@ body {
   margin: 0 auto;
 }
 
-@media (min-width: 720px) {
-  body { padding: 16px; }
-  .app {
-    max-width: 1100px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-      "status  status"
-      "logs    controls"
-      "sensors imu";
-    align-items: start;
-  }
-  .status-bar { grid-area: status; }
-  .log-block  { grid-area: logs; }
-  .controls   { grid-area: controls; }
-  .sensors    { grid-area: sensors; }
-  .imu-card   { grid-area: imu; }
-  .log-list   { height: 237px; }
-}
-
 /* ── Строка состояния ── */
 .status-bar {
   background: var(--surface);
@@ -380,4 +360,56 @@ input[type=range]::-webkit-slider-thumb {
 
 #scythe-current {
   margin-right: 16px;
+}
+
+/* ── История значений ── */
+.history-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 10px 12px;
+}
+.history-canvas {
+  width: 100%;
+  height: 140px;
+  display: block;
+}
+.history-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 8px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.legend-swatch {
+  width: 9px; height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 720px) {
+  body { padding: 16px; }
+  .app {
+    max-width: 1100px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "status  status"
+      "logs    controls"
+      "sensors imu"
+      "history history";
+    align-items: start;
+  }
+  .status-bar   { grid-area: status; }
+  .log-block    { grid-area: logs; }
+  .controls     { grid-area: controls; }
+  .sensors      { grid-area: sensors; }
+  .imu-card     { grid-area: imu; }
+  .history-card { grid-area: history; }
+  .log-list     { height: 237px; }
 }

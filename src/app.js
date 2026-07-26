@@ -160,7 +160,7 @@ const statPctEl       = document.getElementById('stat-pct');
 const scytheCurrentEl = document.getElementById('scythe-current');
 
 /* ── История значений (график) ────────────────────────────── */
-const HISTORY_LEN = 2000;
+const HISTORY_LEN = 500;
 
 const historyCanvas = document.getElementById('history-canvas');
 const historyCtx    = historyCanvas.getContext('2d');
